@@ -73,21 +73,25 @@ function Content() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const contentType = file.type || "application/octet-stream";
 
     try {
       const { uploadUrl, uniqueFileName } = await generateUploadUrl({
         fileName: file.name,
-        fileType: file.type,
+        fileType: contentType,
       });
 
       const result = await fetch(uploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": file.type },
+        headers: { "Content-Type": contentType },
         body: file,
       });
 
       if (!result.ok) {
-        throw new Error("Failed to upload file to S3");
+        const responseText = await result.text().catch(() => "");
+        throw new Error(
+          `Failed to upload file to S3 (${result.status}${responseText ? `: ${responseText}` : ""})`,
+        );
       }
 
       await createFile({
@@ -100,7 +104,15 @@ function Content() {
       toast.success("File uploaded successfully");
     } catch (error) {
       console.error(error);
-      toast.error("Failed to upload file");
+      const message = error instanceof Error ? error.message : "Failed to upload file";
+
+      if (/Failed to fetch|CORS|NetworkError/i.test(message)) {
+        toast.error(
+          "Upload was blocked by S3 CORS or bucket permissions. Allow PUT from http://localhost:5173 on the bucket.",
+        );
+      } else {
+        toast.error(message);
+      }
     }
   };
 

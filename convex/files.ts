@@ -5,17 +5,36 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 
-if (!process.env.CONVEX_AWS_REGION || !process.env.CONVEX_AWS_ACCESS_KEY_ID || !process.env.CONVEX_AWS_SECRET_ACCESS_KEY) {
-  throw new Error("Missing AWS configuration environment variables");
+function getAwsConfig() {
+  const region = process.env.CONVEX_AWS_REGION;
+  const accessKeyId = process.env.CONVEX_AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.CONVEX_AWS_SECRET_ACCESS_KEY;
+
+  if (!region || !accessKeyId || !secretAccessKey) {
+    throw new Error("Missing AWS configuration environment variables");
+  }
+
+  return {
+    region,
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+  };
 }
 
-const s3Client = new S3Client({
-  region: process.env.CONVEX_AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.CONVEX_AWS_ACCESS_KEY_ID as string,
-    secretAccessKey: process.env.CONVEX_AWS_SECRET_ACCESS_KEY as string,
-  },
-});
+function getS3Client() {
+  return new S3Client(getAwsConfig());
+}
+
+function getBucketName() {
+  const bucketName = process.env.CONVEX_AWS_S3_BUCKET;
+  if (!bucketName) {
+    throw new Error("Missing CONVEX_AWS_S3_BUCKET environment variable");
+  }
+
+  return bucketName;
+}
 
 export const generateUploadUrl = mutation({
   args: { fileName: v.string(), fileType: v.string() },
@@ -25,11 +44,13 @@ export const generateUploadUrl = mutation({
 
     // Generate a UUID for the file name
     const uniqueFileName = `${uuidv4()}-${args.fileName}`;
+    const s3Client = getS3Client();
+    const contentType = args.fileType || "application/octet-stream";
 
     const command = new PutObjectCommand({
-      Bucket: process.env.CONVEX_AWS_S3_BUCKET,
+      Bucket: getBucketName(),
       Key: uniqueFileName, // Use the UUID as the file name
-      ContentType: args.fileType,
+      ContentType: contentType,
     });
 
     const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
@@ -95,6 +116,7 @@ export const listItems = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return { files: [], folders: [] };
+    const s3Client = getS3Client();
 
     const files = await ctx.db
       .query("files")
@@ -109,7 +131,7 @@ export const listItems = query({
     const filesWithUrls = await Promise.all(
       files.map(async (file) => {
         const command = new GetObjectCommand({
-          Bucket: process.env.CONVEX_AWS_S3_BUCKET,
+          Bucket: getBucketName(),
           Key: file.storageId,
         });
         const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
@@ -202,8 +224,9 @@ export const deleteFile = mutation({
 export const deleteFileFromS3 = action({
   args: { storageId: v.string() },
   handler: async (ctx, args) => {
+    const s3Client = getS3Client();
     const deleteParams = {
-      Bucket: process.env.CONVEX_AWS_S3_BUCKET,
+      Bucket: getBucketName(),
       Key: args.storageId,
     };
 
