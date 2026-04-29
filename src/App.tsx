@@ -14,37 +14,33 @@ import { SignOutButton } from "./SignOutButton";
 
 export default function App() {
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-hero-radial"
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[540px] w-[540px] -translate-x-1/2 rounded-full bg-indigo-500/20 blur-[140px]"
-        aria-hidden="true"
-      />
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-base font-semibold text-white shadow-glow">
-              CL
-            </span>
-            <div>
-              <h1 className="text-base font-semibold text-slate-50">
-                Cloudlet
-              </h1>
-              <p className="text-xs text-slate-400">Store. Organize. Share.</p>
-            </div>
+    <div className="relative flex min-h-screen flex-col font-sans">
+      {/* Background orbs */}
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute -top-[20%] -left-[10%] h-[50vw] w-[50vw] rounded-full bg-rose-600/10 blur-[120px]" />
+        <div className="absolute top-[20%] -right-[10%] h-[40vw] w-[40vw] rounded-full bg-amber-600/10 blur-[120px]" />
+        <div className="absolute -bottom-[20%] left-[20%] h-[60vw] w-[60vw] rounded-full bg-fuchsia-600/10 blur-[120px]" />
+      </div>
+
+      <header className="fixed top-6 left-1/2 z-50 -translate-x-1/2 w-[95%] max-w-5xl rounded-full border border-white/10 bg-neutral-950/60 p-2 pr-4 backdrop-blur-2xl shadow-2xl flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-amber-500 text-lg font-black text-white shadow-[0_0_20px_rgba(244,63,94,0.4)]">
+            CL
           </div>
-          <SignOutButton />
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-white">Cloudlet</h1>
+            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Vault</p>
+          </div>
         </div>
+        <SignOutButton />
       </header>
-      <main className="relative z-10 flex-1 px-4 pb-16 pt-10 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
+
+      <main className="relative z-10 flex-1 px-4 pt-36 pb-24 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-4xl">
           <Content />
         </div>
       </main>
-      <Toaster richColors closeButton position="top-right" />
+      <Toaster richColors closeButton position="top-center" theme="dark" />
     </div>
   );
 }
@@ -64,8 +60,8 @@ function Content() {
 
   if (loggedInUser === undefined) {
     return (
-      <div className="flex min-h-[420px] items-center justify-center">
-        <span className="h-12 w-12 animate-spin rounded-full border-2 border-white/10 border-t-indigo-400" />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-neutral-800 border-t-rose-500" />
       </div>
     );
   }
@@ -146,229 +142,154 @@ function Content() {
     items.files.length === 0;
 
   return (
-    <div className="flex flex-col gap-10 pb-10">
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <div className="glass-panel relative overflow-hidden p-8">
-          <div className="relative z-10 flex flex-col gap-6">
-            <div className="flex flex-col gap-4">
-              <span className="inline-flex w-fit animate-glow items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-300">
-                Cloud workspace
-              </span>
-              <h2 className="text-4xl font-semibold leading-tight text-slate-50 md:text-5xl">
-                CloudLet
-              </h2>
-              <Authenticated>
-                <p className="text-lg text-slate-300">
-                  Welcome back, {loggedInUser?.email ?? "friend"}! Manage,
-                  organize, and keep every file within reach.
-                </p>
-              </Authenticated>
-              <Unauthenticated>
-                <p className="text-lg text-slate-300">
-                  Sign in to unlock secure storage with elegant organization and
-                  instant access.
-                </p>
-              </Unauthenticated>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-slate-200">
-                <span className="block text-xs uppercase tracking-wide text-slate-400">
-                  Uploads
-                </span>
-                Lightning-fast transfers direct to secure cloud storage.
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-slate-200">
-                <span className="block text-xs uppercase tracking-wide text-slate-400">
-                  Organization
-                </span>
-                Nest folders to keep work and personal projects tidy.
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-slate-200">
-                <span className="block text-xs uppercase tracking-wide text-slate-400">
-                  Access
-                </span>
-                Download or share files instantly with expiring links.
-              </div>
-            </div>
-          </div>
+    <div className="flex flex-col gap-16">
+      {/* HERO SECTION */}
+      <section className="flex flex-col items-center text-center gap-8 py-10">
+        <div className="inline-flex items-center gap-3 rounded-full border border-rose-500/20 bg-rose-500/10 px-5 py-2 text-sm font-bold text-rose-400">
+          <span className="relative flex h-3 w-3">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75"></span>
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-rose-500"></span>
+          </span>
+          SECURE VAULT
         </div>
-        <div className="space-y-6">
-          <Authenticated>
-            <div className="glass-panel h-full p-8">
-              <div className="relative z-10 flex h-full flex-col justify-between gap-6">
-                <div className="space-y-3">
-                  <h3 className="text-xl font-semibold text-slate-50">
-                    Stay in flow
-                  </h3>
-                  <p className="text-sm text-slate-300">
-                    Use quick actions below to keep your workspace organized.
-                    Files are backed by secure object storage.
-                  </p>
-                </div>
-                <div className="grid gap-3 text-sm text-slate-300">
-                  <div className="flex items-center gap-3">
-                    <span className="h-2.5 w-2.5 rounded-full bg-indigo-400" />
-                    Encrypted uploads with expiring S3 URLs.
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                    Manage folders to reflect your workflow.
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="h-2.5 w-2.5 rounded-full bg-sky-400" />
-                    Download files anywhere, anytime.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Authenticated>
-          <Unauthenticated>
-            <SignInForm />
-          </Unauthenticated>
-        </div>
+        <h2 className="text-5xl font-black tracking-tighter text-white sm:text-7xl">
+          Your Digital <br />
+          <span className="bg-gradient-to-r from-rose-400 via-fuchsia-400 to-amber-400 bg-clip-text text-transparent">
+            Sanctuary.
+          </span>
+        </h2>
+        <Authenticated>
+          <p className="max-w-xl text-lg font-medium text-neutral-400 sm:text-xl">
+            Welcome back, <span className="text-white">{loggedInUser?.email ?? "friend"}</span>. Your files are encrypted and ready.
+          </p>
+        </Authenticated>
+        <Unauthenticated>
+          <p className="max-w-xl text-lg font-medium text-neutral-400 sm:text-xl">
+            A minimalist, lightning-fast cloud storage solution designed for seamless organization.
+          </p>
+        </Unauthenticated>
       </section>
+
+      <Unauthenticated>
+        <div className="mx-auto w-full max-w-md">
+          <SignInForm />
+        </div>
+      </Unauthenticated>
 
       <Authenticated>
         <>
-          <section className="glass-panel p-6">
-            <div className="relative z-10 flex flex-col gap-6">
-              <div className="flex flex-col gap-1">
-                <h3 className="text-lg font-semibold text-slate-50">
-                  Library actions
-                </h3>
-                <p className="text-sm text-slate-300">
-                  Upload files or create folders to keep everything streamlined.
-                </p>
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <input
-                  type="file"
-                  ref={fileInput}
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInput.current?.click()}
-                  className="btn-primary"
-                >
-                  Upload File
-                </button>
-                <button
-                  onClick={handleCreateFolder}
-                  className="btn-secondary"
-                >
-                  New Folder
-                </button>
-                {currentFolder && (
-                  <button
-                    onClick={() => setCurrentFolder(null)}
-                    className="btn-secondary"
-                  >
-                    Back to Root
-                  </button>
-                )}
-              </div>
-              <p className="text-xs text-slate-400">
-                Tip: Files remain available for download for an hour after each
-                link is generated.
-              </p>
+          {/* ACTIONS BAR */}
+          <section className="sticky top-28 z-40 flex flex-col gap-4 rounded-[2rem] border border-white/5 bg-neutral-900/80 p-4 backdrop-blur-xl shadow-2xl sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <input type="file" ref={fileInput} onChange={handleFileUpload} className="hidden" />
+              <button onClick={() => fileInput.current?.click()} className="btn-primary px-6 py-3 text-sm">
+                <span className="text-lg">+</span> Upload File
+              </button>
+              <button onClick={handleCreateFolder} className="btn-secondary px-6 py-3 text-sm">
+                New Folder
+              </button>
             </div>
+            {currentFolder && (
+              <button onClick={() => setCurrentFolder(null)} className="btn-ghost">
+                ← Back to Root
+              </button>
+            )}
           </section>
 
-          <section className="flex flex-col gap-6">
+          {/* LIST VIEW */}
+          <section className="flex flex-col gap-4">
             {isLoadingItems ? (
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {Array.from({ length: 3 }).map((_, index) => (
+              <div className="flex flex-col gap-4">
+                {Array.from({ length: 4 }).map((_, index) => (
                   <div
                     key={index}
-                    className="animate-pulse rounded-3xl border border-white/10 bg-white/5 p-6"
+                    className="h-24 w-full animate-pulse rounded-3xl bg-white/[0.03]"
                   />
                 ))}
               </div>
             ) : (
-              <>
-                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                  {items?.folders.map((folder) => (
-                    <div
-                      key={folder._id}
-                      className="group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/60 p-5 shadow-lg transition hover:-translate-y-1 hover:border-indigo-400/40 hover:shadow-glow"
+              <div className="flex flex-col gap-4">
+                {items?.folders.map((folder) => (
+                  <div
+                    key={folder._id}
+                    className="group flex items-center justify-between rounded-3xl border border-white/5 bg-white/[0.02] p-4 transition-all hover:border-white/10 hover:bg-white/[0.04] hover:shadow-xl"
+                  >
+                    <button
+                      onClick={() => setCurrentFolder(folder._id)}
+                      className="flex flex-1 items-center gap-5 text-left outline-none"
                     >
-                      <div className="flex items-center justify-between gap-4">
-                        <button
-                          onClick={() => setCurrentFolder(folder._id)}
-                          className="flex items-center gap-3 text-left transition hover:opacity-90"
-                        >
-                          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/15 text-2xl">
-                            📁
-                          </span>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-semibold text-slate-100">
-                              {folder.name}
-                            </span>
-                            <span className="text-xs text-slate-400">
-                              Open folder
-                            </span>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => deleteFolder({ folderId: folder._id })}
-                          className="rounded-full border border-red-400/30 px-3 py-1.5 text-xs font-medium text-red-300 transition hover:border-red-300 hover:bg-red-500/10"
-                        >
-                          Delete
-                        </button>
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-neutral-800 text-2xl transition-colors group-hover:bg-amber-500/20 group-hover:text-amber-400">
+                        📁
                       </div>
-                    </div>
-                  ))}
+                      <div className="flex flex-col">
+                        <span className="text-lg font-bold text-neutral-100 transition-colors group-hover:text-white">
+                          {folder.name}
+                        </span>
+                        <span className="text-sm font-medium text-neutral-500">
+                          Folder
+                        </span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => deleteFolder({ folderId: folder._id })}
+                      className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-bold text-red-500 opacity-0 transition-all hover:bg-red-500/20 group-hover:opacity-100"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
 
-                  {items?.files.map((file) => (
-                    <div
-                      key={file._id}
-                      className="relative flex flex-col gap-4 rounded-3xl border border-white/10 bg-slate-900/60 p-5 shadow-lg transition hover:-translate-y-1 hover:border-indigo-400/40 hover:shadow-glow"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/15 text-2xl">
-                            📄
-                          </span>
-                          <div>
-                            <p className="text-sm font-semibold text-slate-100">
-                              {file.name}
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              {(file.size / 1024 / 1024).toFixed(2)} MB •{" "}
-                              {new Date(file._creationTime).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
+                {items?.files.map((file) => (
+                  <div
+                    key={file._id}
+                    className="group flex items-center justify-between rounded-3xl border border-white/5 bg-white/[0.02] p-4 transition-all hover:border-white/10 hover:bg-white/[0.04] hover:shadow-xl"
+                  >
+                    <div className="flex flex-1 items-center gap-5">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-neutral-800 text-2xl transition-colors group-hover:bg-rose-500/20 group-hover:text-rose-400">
+                        📄
                       </div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        {file.url && (
-                          <a
-                            href={file.url}
-                            download={file.name}
-                            className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-indigo-400/60 hover:text-indigo-300"
-                          >
-                            Download
-                          </a>
-                        )}
-                        <button
-                          onClick={() => handleDeleteFile(file)}
-                          className="inline-flex items-center gap-1 rounded-full border border-red-400/30 px-3 py-1.5 text-xs font-medium text-red-300 transition hover:border-red-300 hover:bg-red-500/10"
-                        >
-                          Delete
-                        </button>
+                      <div className="flex flex-col">
+                        <span className="text-lg font-bold text-neutral-100 transition-colors group-hover:text-white line-clamp-1">
+                          {file.name}
+                        </span>
+                        <span className="text-sm font-medium text-neutral-500 mt-0.5">
+                          {(file.size / 1024 / 1024).toFixed(2)} MB •{" "}
+                          {new Date(file._creationTime).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex items-center gap-3 opacity-0 transition-all group-hover:opacity-100">
+                      {file.url && (
+                        <a
+                          href={file.url}
+                          download={file.name}
+                          className="rounded-xl bg-neutral-800 px-4 py-2 text-sm font-bold text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white"
+                        >
+                          Download
+                        </a>
+                      )}
+                      <button
+                        onClick={() => handleDeleteFile(file)}
+                        className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-bold text-red-500 transition-colors hover:bg-red-500/20"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
 
                 {hasNoContent && (
-                  <div className="glass-panel p-10 text-center text-slate-300">
-                    Start by uploading a file or creating a folder to see it appear
-                    here.
+                  <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-neutral-800 bg-white/[0.01] p-16 text-center">
+                    <div className="mb-6 text-6xl opacity-30">📭</div>
+                    <h3 className="text-xl font-bold text-neutral-200">
+                      Vault is empty
+                    </h3>
+                    <p className="mt-2 text-sm font-medium text-neutral-500">
+                      Upload a file or create a folder to begin.
+                    </p>
                   </div>
                 )}
-              </>
+              </div>
             )}
           </section>
         </>

@@ -9,19 +9,20 @@ export function SignInForm() {
   const [submitting, setSubmitting] = useState(false);
 
   return (
-    <div className="glass-panel mx-auto max-w-md overflow-hidden p-8">
-      <div className="relative z-10 space-y-2 text-center">
-        <h3 className="text-2xl font-semibold tracking-tight text-slate-50">
-          Access your space
-        </h3>
-        <p className="text-sm text-slate-300">
-          {flow === "signIn"
-            ? "Welcome back! Enter your details to continue."
-            : "Create an account to start storing securely."}
-        </p>
+    <div className="glass-panel w-full p-10 text-center">
+      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-rose-500 to-amber-500 shadow-[0_0_40px_rgba(244,63,94,0.3)]">
+         <span className="text-4xl text-white">✨</span>
       </div>
+      <h3 className="mb-2 text-3xl font-black tracking-tighter text-white">
+        Enter the Vault
+      </h3>
+      <p className="mb-8 text-sm font-medium text-neutral-400">
+        {flow === "signIn"
+          ? "Welcome back. Authenticate to continue."
+          : "Create an identity to secure your files."}
+      </p>
       <form
-        className="relative z-10 mt-8 space-y-5"
+        className="space-y-6 text-left"
         onSubmit={(e) => {
           e.preventDefault();
           setSubmitting(true);
@@ -37,11 +38,8 @@ export function SignInForm() {
           });
         }}
       >
-        <div className="space-y-2 text-left">
-          <label
-            htmlFor="email"
-            className="text-sm font-medium text-slate-200"
-          >
+        <div className="space-y-2">
+          <label htmlFor="email" className="text-sm font-bold text-neutral-300">
             Email
           </label>
           <input
@@ -53,11 +51,8 @@ export function SignInForm() {
             required
           />
         </div>
-        <div className="space-y-2 text-left">
-          <label
-            htmlFor="password"
-            className="text-sm font-medium text-slate-200"
-          >
+        <div className="space-y-2">
+          <label htmlFor="password" className="text-sm font-bold text-neutral-300">
             Password
           </label>
           <input
@@ -69,34 +64,34 @@ export function SignInForm() {
             required
           />
         </div>
-        <button className="btn-primary w-full" type="submit" disabled={submitting}>
-          {flow === "signIn" ? "Sign in" : "Sign up"}
+        <button className="btn-primary w-full py-4 text-base" type="submit" disabled={submitting}>
+          {flow === "signIn" ? "Authenticate" : "Create Vault"}
         </button>
-        <div className="text-center text-sm text-slate-400">
+        <div className="text-center text-sm font-medium text-neutral-500">
           <span>
             {flow === "signIn"
-              ? "Don't have an account? "
-              : "Already have an account? "}
+              ? "Don't have an identity? "
+              : "Already have an identity? "}
           </span>
           <button
             type="button"
-            className="link-text"
+            className="link-text ml-1"
             onClick={() => setFlow(flow === "signIn" ? "signUp" : "signIn")}
           >
             {flow === "signIn" ? "Sign up instead" : "Sign in instead"}
           </button>
         </div>
       </form>
-      <div className="relative z-10 my-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+      <div className="my-8 flex items-center gap-4 text-xs font-bold uppercase tracking-widest text-neutral-600">
         <span className="h-px flex-1 bg-white/10" />
-        <span>or</span>
+        <span>OR</span>
         <span className="h-px flex-1 bg-white/10" />
       </div>
       <button
-        className="btn-secondary relative z-10 w-full"
+        className="btn-secondary w-full py-4 text-base"
         onClick={() => void signIn("anonymous")}
       >
-        Sign in anonymously
+        Access Anonymously
       </button>
     </div>
   );
