@@ -1,7 +1,6 @@
 import {
   Authenticated,
   Unauthenticated,
-  useAction,
   useMutation,
   useQuery,
 } from "convex/react";
@@ -56,8 +55,6 @@ function Content() {
   const createFolder = useMutation(api.files.createFolder);
   const deleteFile = useMutation(api.files.deleteFile);
   const deleteFolder = useMutation(api.files.deleteFolder);
-  const deleteFileFromS3 = useAction(api.files.deleteFileFromS3);
-
   if (loggedInUser === undefined) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -127,7 +124,6 @@ function Content() {
   const handleDeleteFile = async (file: { _id: string; storageId: string }) => {
     try {
       await deleteFile({ storageId: file.storageId });
-      await deleteFileFromS3({ storageId: file.storageId });
       toast.success("File deleted successfully");
     } catch (error) {
       console.error(error);

@@ -13,6 +13,10 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
+# Vite inlines VITE_* vars at build time
+ARG VITE_CONVEX_URL
+ENV VITE_CONVEX_URL=$VITE_CONVEX_URL
+
 # Build the Vite app
 RUN npm run build
 

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query, internalAction } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -121,11 +122,13 @@ export const listItems = query({
     const files = await ctx.db
       .query("files")
       .withIndex("by_parent", (q) => q.eq("parentId", args.parentId))
+      .filter((q) => q.eq(q.field("ownerId"), userId))
       .collect();
 
     const folders = await ctx.db
       .query("folders")
       .withIndex("by_parent", (q) => q.eq("parentId", args.parentId))
+      .filter((q) => q.eq(q.field("ownerId"), userId))
       .collect();
 
     const filesWithUrls = await Promise.all(
@@ -218,10 +221,14 @@ export const deleteFile = mutation({
 
     // Delete the file record from the database
     await ctx.db.delete(file._id);
+    // S3 delete runs only after the ownership check above, and only if this mutation commits
+    await ctx.scheduler.runAfter(0, internal.files.deleteFileFromS3, {
+      storageId: args.storageId,
+    });
   },
 });
 
-export const deleteFileFromS3 = action({
+export const deleteFileFromS3 = internalAction({
   args: { storageId: v.string() },
   handler: async (ctx, args) => {
     const s3Client = getS3Client();
