@@ -11,7 +11,7 @@ export function SignOutButton() {
   }
 
   return (
-    <button className="btn-ghost" onClick={() => void signOut()}>
+    <button className="btn-quiet" onClick={() => void signOut()}>
       Sign out
     </button>
   );

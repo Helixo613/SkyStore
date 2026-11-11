@@ -13,61 +13,55 @@ import { SignOutButton } from "./SignOutButton";
 
 export default function App() {
   return (
-    <div className="relative flex min-h-screen flex-col font-sans">
-      {/* Background orbs */}
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute -top-[20%] -left-[10%] h-[50vw] w-[50vw] rounded-full bg-rose-600/10 blur-[120px]" />
-        <div className="absolute top-[20%] -right-[10%] h-[40vw] w-[40vw] rounded-full bg-amber-600/10 blur-[120px]" />
-        <div className="absolute -bottom-[20%] left-[20%] h-[60vw] w-[60vw] rounded-full bg-fuchsia-600/10 blur-[120px]" />
-      </div>
-
-      <header className="fixed top-6 left-1/2 z-50 -translate-x-1/2 w-[95%] max-w-5xl rounded-full border border-white/10 bg-neutral-950/60 p-2 pr-4 backdrop-blur-2xl shadow-2xl flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-amber-500 text-lg font-black text-white shadow-[0_0_20px_rgba(244,63,94,0.4)]">
-            CL
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">SkyStore</h1>
-            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Vault</p>
-          </div>
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b border-line bg-surface px-4 sm:px-6">
+        <div className="mx-auto flex h-14 w-full max-w-4xl items-center justify-between">
+          <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
+            <CloudIcon />
+            SkyStore
+          </span>
+          <SignOutButton />
         </div>
-        <SignOutButton />
       </header>
 
-      <main className="relative z-10 flex-1 px-4 pt-36 pb-24 sm:px-6 lg:px-8">
+      <main className="flex-1 px-4 py-10 sm:px-6">
         <div className="mx-auto w-full max-w-4xl">
           <Content />
         </div>
       </main>
-      <Toaster richColors closeButton position="top-center" theme="dark" />
+      <Toaster position="bottom-right" />
     </div>
   );
 }
 
+type Crumb = { id: Id<"folders">; name: string };
+
 function Content() {
   const loggedInUser = useQuery(api.auth.loggedInUser);
-  const [currentFolder, setCurrentFolder] = useState<Id<"folders"> | null>(null);
+  const [path, setPath] = useState<Crumb[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [creatingFolder, setCreatingFolder] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  const currentFolder = path.length ? path[path.length - 1].id : null;
   const items = useQuery(api.files.listItems, { parentId: currentFolder });
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const createFile = useMutation(api.files.createFile);
   const createFolder = useMutation(api.files.createFolder);
   const deleteFile = useMutation(api.files.deleteFile);
   const deleteFolder = useMutation(api.files.deleteFolder);
+
   if (loggedInUser === undefined) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-neutral-800 border-t-rose-500" />
-      </div>
-    );
+    return <p className="py-24 text-center text-sm text-muted">Loading…</p>;
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
     if (!file) return;
     const contentType = file.type || "application/octet-stream";
 
+    setUploading(true);
     try {
       const { uploadUrl, uniqueFileName } = await generateUploadUrl({
         fileName: file.name,
@@ -81,10 +75,7 @@ function Content() {
       });
 
       if (!result.ok) {
-        const responseText = await result.text().catch(() => "");
-        throw new Error(
-          `Failed to upload file to S3 (${result.status}${responseText ? `: ${responseText}` : ""})`,
-        );
+        throw new Error(`Upload failed with status ${result.status}. Try again.`);
       }
 
       await createFile({
@@ -94,202 +85,273 @@ function Content() {
         parentId: currentFolder,
       });
 
-      toast.success("File uploaded successfully");
+      toast.success(`Uploaded ${file.name}`);
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : "Failed to upload file";
-
+      const message = error instanceof Error ? error.message : "Upload failed. Try again.";
       if (/Failed to fetch|CORS|NetworkError/i.test(message)) {
-        toast.error(
-          "Upload was blocked by S3 CORS or bucket permissions. Allow PUT from http://localhost:5173 on the bucket.",
-        );
+        toast.error("Storage refused the upload. Check the bucket's CORS settings for this address.");
       } else {
         toast.error(message);
       }
+    } finally {
+      setUploading(false);
     }
   };
 
-  const handleCreateFolder = async () => {
-    const name = prompt("Enter folder name:");
-    if (!name) return;
-
+  const handleCreateFolder = async (name: string) => {
     try {
       await createFolder({ name, parentId: currentFolder });
-      toast.success("Folder created successfully");
-    } catch (error) {
-      toast.error("Failed to create folder");
+      setCreatingFolder(false);
+    } catch {
+      toast.error("Couldn't create the folder. Try again.");
     }
   };
 
-  const handleDeleteFile = async (file: { _id: string; storageId: string }) => {
+  const handleDeleteFolder = async (folder: { _id: Id<"folders">; name: string }) => {
+    if (!confirm(`Delete "${folder.name}" and everything in it? This can't be undone.`)) return;
+    try {
+      await deleteFolder({ folderId: folder._id });
+      toast.success(`Deleted ${folder.name}`);
+    } catch {
+      toast.error("Couldn't delete the folder. Try again.");
+    }
+  };
+
+  const handleDeleteFile = async (file: { storageId: string; name: string }) => {
     try {
       await deleteFile({ storageId: file.storageId });
-      toast.success("File deleted successfully");
+      toast.success(`Deleted ${file.name}`);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to delete file");
+      toast.error("Couldn't delete the file. Try again.");
     }
   };
 
-  const isLoadingItems = items === undefined;
   const hasNoContent =
-    items !== undefined &&
-    items.folders.length === 0 &&
-    items.files.length === 0;
+    items !== undefined && items.folders.length === 0 && items.files.length === 0;
 
   return (
-    <div className="flex flex-col gap-16">
-      {/* HERO SECTION */}
-      <section className="flex flex-col items-center text-center gap-8 py-10">
-        <div className="inline-flex items-center gap-3 rounded-full border border-rose-500/20 bg-rose-500/10 px-5 py-2 text-sm font-bold text-rose-400">
-          <span className="relative flex h-3 w-3">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75"></span>
-            <span className="relative inline-flex h-3 w-3 rounded-full bg-rose-500"></span>
-          </span>
-          SECURE VAULT
-        </div>
-        <h2 className="text-5xl font-black tracking-tighter text-white sm:text-7xl">
-          Your Digital <br />
-          <span className="bg-gradient-to-r from-rose-400 via-fuchsia-400 to-amber-400 bg-clip-text text-transparent">
-            Sanctuary.
-          </span>
-        </h2>
-        <Authenticated>
-          <p className="max-w-xl text-lg font-medium text-neutral-400 sm:text-xl">
-            Welcome back, <span className="text-white">{loggedInUser?.email ?? "friend"}</span>. Your files are encrypted and ready.
-          </p>
-        </Authenticated>
-        <Unauthenticated>
-          <p className="max-w-xl text-lg font-medium text-neutral-400 sm:text-xl">
-            A minimalist, lightning-fast cloud storage solution designed for seamless organization.
-          </p>
-        </Unauthenticated>
-      </section>
-
+    <>
       <Unauthenticated>
-        <div className="mx-auto w-full max-w-md">
-          <SignInForm />
-        </div>
+        <SignInForm />
       </Unauthenticated>
 
       <Authenticated>
-        <>
-          {/* ACTIONS BAR */}
-          <section className="sticky top-28 z-40 flex flex-col gap-4 rounded-[2rem] border border-white/5 bg-neutral-900/80 p-4 backdrop-blur-xl shadow-2xl sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <nav aria-label="Folder path">
+              <ol className="flex flex-wrap items-baseline gap-x-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+                <li>
+                  {path.length ? (
+                    <button className="text-muted hover:text-ink" onClick={() => setPath([])}>
+                      My files
+                    </button>
+                  ) : (
+                    <span aria-current="page">My files</span>
+                  )}
+                </li>
+                {path.map((crumb, i) => (
+                  <li key={crumb.id} className="flex items-baseline gap-x-2">
+                    <span className="text-line" aria-hidden>/</span>
+                    {i === path.length - 1 ? (
+                      <span aria-current="page" className="break-all">{crumb.name}</span>
+                    ) : (
+                      <button
+                        className="break-all text-muted hover:text-ink"
+                        onClick={() => setPath(path.slice(0, i + 1))}
+                      >
+                        {crumb.name}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </nav>
+
+            <div className="flex shrink-0 gap-2">
               <input type="file" ref={fileInput} onChange={handleFileUpload} className="hidden" />
-              <button onClick={() => fileInput.current?.click()} className="btn-primary px-6 py-3 text-sm">
-                <span className="text-lg">+</span> Upload File
+              <button className="btn-secondary" onClick={() => setCreatingFolder(true)}>
+                New folder
               </button>
-              <button onClick={handleCreateFolder} className="btn-secondary px-6 py-3 text-sm">
-                New Folder
+              <button
+                className="btn-primary"
+                onClick={() => fileInput.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? "Uploading…" : "Upload file"}
               </button>
             </div>
-            {currentFolder && (
-              <button onClick={() => setCurrentFolder(null)} className="btn-ghost">
-                ← Back to Root
-              </button>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+            <div className="hidden grid-cols-[1fr_6rem_8rem_9.5rem] gap-4 border-b border-line px-4 py-2.5 text-xs font-medium text-muted sm:grid">
+              <span>Name</span>
+              <span className="text-right">Size</span>
+              <span>Added</span>
+              <span className="sr-only">Actions</span>
+            </div>
+
+            {creatingFolder && (
+              <NewFolderRow onCreate={handleCreateFolder} onCancel={() => setCreatingFolder(false)} />
             )}
-          </section>
 
-          {/* LIST VIEW */}
-          <section className="flex flex-col gap-4">
-            {isLoadingItems ? (
-              <div className="flex flex-col gap-4">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="h-24 w-full animate-pulse rounded-3xl bg-white/[0.03]"
-                  />
-                ))}
-              </div>
+            {items === undefined ? (
+              <p className="px-4 py-10 text-center text-sm text-muted">Loading files…</p>
             ) : (
-              <div className="flex flex-col gap-4">
-                {items?.folders.map((folder) => (
-                  <div
-                    key={folder._id}
-                    className="group flex items-center justify-between rounded-3xl border border-white/5 bg-white/[0.02] p-4 transition-all hover:border-white/10 hover:bg-white/[0.04] hover:shadow-xl"
-                  >
+              <ul className="divide-y divide-line">
+                {items.folders.map((folder) => (
+                  <li key={folder._id} className={rowClass}>
                     <button
-                      onClick={() => setCurrentFolder(folder._id)}
-                      className="flex flex-1 items-center gap-5 text-left outline-none"
+                      className="flex min-w-0 items-center gap-3 text-left font-medium hover:text-accent"
+                      onClick={() => setPath([...path, { id: folder._id, name: folder.name }])}
                     >
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-neutral-800 text-2xl transition-colors group-hover:bg-amber-500/20 group-hover:text-amber-400">
-                        📁
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-lg font-bold text-neutral-100 transition-colors group-hover:text-white">
-                          {folder.name}
-                        </span>
-                        <span className="text-sm font-medium text-neutral-500">
-                          Folder
-                        </span>
-                      </div>
+                      <FolderIcon />
+                      <span className="truncate">{folder.name}</span>
                     </button>
-                    <button
-                      onClick={() => deleteFolder({ folderId: folder._id })}
-                      className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-bold text-red-500 opacity-0 transition-all hover:bg-red-500/20 group-hover:opacity-100"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
-
-                {items?.files.map((file) => (
-                  <div
-                    key={file._id}
-                    className="group flex items-center justify-between rounded-3xl border border-white/5 bg-white/[0.02] p-4 transition-all hover:border-white/10 hover:bg-white/[0.04] hover:shadow-xl"
-                  >
-                    <div className="flex flex-1 items-center gap-5">
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-neutral-800 text-2xl transition-colors group-hover:bg-rose-500/20 group-hover:text-rose-400">
-                        📄
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-lg font-bold text-neutral-100 transition-colors group-hover:text-white line-clamp-1">
-                          {file.name}
-                        </span>
-                        <span className="text-sm font-medium text-neutral-500 mt-0.5">
-                          {(file.size / 1024 / 1024).toFixed(2)} MB •{" "}
-                          {new Date(file._creationTime).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 opacity-0 transition-all group-hover:opacity-100">
-                      {file.url && (
-                        <a
-                          href={file.url}
-                          download={file.name}
-                          className="rounded-xl bg-neutral-800 px-4 py-2 text-sm font-bold text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white"
-                        >
-                          Download
-                        </a>
-                      )}
-                      <button
-                        onClick={() => handleDeleteFile(file)}
-                        className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-bold text-red-500 transition-colors hover:bg-red-500/20"
-                      >
+                    <span className="hidden text-right text-muted sm:block">—</span>
+                    <span className="hidden text-muted sm:block">
+                      {formatDate(folder._creationTime)}
+                    </span>
+                    <div className="flex justify-end">
+                      <button className="btn-danger" onClick={() => handleDeleteFolder(folder)}>
                         Delete
                       </button>
                     </div>
-                  </div>
+                  </li>
                 ))}
 
-                {hasNoContent && (
-                  <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-neutral-800 bg-white/[0.01] p-16 text-center">
-                    <div className="mb-6 text-6xl opacity-30">📭</div>
-                    <h3 className="text-xl font-bold text-neutral-200">
-                      Vault is empty
-                    </h3>
-                    <p className="mt-2 text-sm font-medium text-neutral-500">
-                      Upload a file or create a folder to begin.
-                    </p>
-                  </div>
-                )}
+                {items.files.map((file) => (
+                  <li key={file._id} className={rowClass}>
+                    <span className="flex min-w-0 items-center gap-3">
+                      <FileIcon />
+                      <span className="truncate">{file.name}</span>
+                    </span>
+                    <span className="hidden text-right tabular-nums text-muted sm:block">
+                      {formatSize(file.size)}
+                    </span>
+                    <span className="hidden tabular-nums text-muted sm:block">
+                      {formatDate(file._creationTime)}
+                    </span>
+                    <div className="flex justify-end gap-1">
+                      {file.url && (
+                        <a className="btn-quiet" href={file.url} download={file.name}>
+                          Download
+                        </a>
+                      )}
+                      <button className="btn-danger" onClick={() => handleDeleteFile(file)}>
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {hasNoContent && !creatingFolder && (
+              <div className="px-4 py-14 text-center">
+                <p className="font-medium">
+                  {path.length ? "This folder is empty" : "No files yet"}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  Upload a file or create a folder to get started.
+                </p>
               </div>
             )}
-          </section>
-        </>
+          </div>
+        </div>
       </Authenticated>
-    </div>
+    </>
+  );
+}
+
+const rowClass =
+  "grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-2.5 text-sm sm:grid-cols-[1fr_6rem_8rem_9.5rem]";
+
+function NewFolderRow({
+  onCreate,
+  onCancel,
+}: {
+  onCreate: (name: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  return (
+    <form
+      className="flex items-center gap-2 border-b border-line px-4 py-2.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const trimmed = name.trim();
+        if (trimmed) void onCreate(trimmed);
+      }}
+    >
+      <FolderIcon />
+      <input
+        autoFocus
+        className="input-field py-1.5"
+        placeholder="Folder name"
+        aria-label="Folder name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && onCancel()}
+      />
+      <button type="submit" className="btn-primary py-1.5" disabled={!name.trim()}>
+        Create
+      </button>
+      <button type="button" className="btn-quiet" onClick={onCancel}>
+        Cancel
+      </button>
+    </form>
+  );
+}
+
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+}
+
+function formatDate(ms: number) {
+  return new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function CloudIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden className="text-accent">
+      <path
+        d="M7 18h10.5a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.5 9.1 4.5 4.5 0 0 0 7 18Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden className="shrink-0 text-accent">
+      <path
+        d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.4l2 2h8.6A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-11Z"
+        fill="currentColor"
+        fillOpacity="0.18"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 text-muted">
+      <path
+        d="M6 3.5h8l4 4v13H6v-17Z M14 3.5v4h4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
