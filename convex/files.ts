@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query, internalAction } from "./_generated/server";
+import { mutation, query, internalAction, MutationCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
@@ -37,14 +38,24 @@ function getBucketName() {
   return bucketName;
 }
 
+async function assertOwnsParent(
+  ctx: MutationCtx,
+  parentId: Id<"folders"> | null | undefined,
+  userId: Id<"users">,
+) {
+  if (!parentId) return;
+  const parent = await ctx.db.get(parentId);
+  if (!parent || parent.ownerId !== userId) throw new Error("Folder not found or unauthorized");
+}
+
 export const generateUploadUrl = mutation({
   args: { fileName: v.string(), fileType: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    // Generate a UUID for the file name
-    const uniqueFileName = `${uuidv4()}-${args.fileName}`;
+    // Prefix with the uploader's id so createFile can verify the key belongs to the caller
+    const uniqueFileName = `${userId}/${uuidv4()}-${args.fileName}`;
     const s3Client = getS3Client();
     const contentType = args.fileType || "application/octet-stream";
 
@@ -81,6 +92,15 @@ export const createFile = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+    await assertOwnsParent(ctx, args.parentId, userId);
+
+    // Only keys issued to this user by generateUploadUrl, and only once
+    if (!args.storageId.startsWith(`${userId}/`)) throw new Error("Unauthorized");
+    const existing = await ctx.db
+      .query("files")
+      .withIndex("by_storageId", (q) => q.eq("storageId", args.storageId))
+      .first();
+    if (existing) throw new Error("File already registered");
 
     return await ctx.db.insert("files", {
       name: args.name,
@@ -100,6 +120,7 @@ export const createFolder = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+    await assertOwnsParent(ctx, args.parentId, userId);
 
     return await ctx.db.insert("folders", {
       name: args.name,
@@ -267,6 +288,7 @@ export const deleteFolder = mutation({
         .withIndex("by_parent", (q) => q.eq("parentId", id))
         .collect();
       for (const file of files) {
+        if (file.ownerId !== userId) continue; // defense in depth; parent checks should prevent this
         await ctx.db.delete(file._id);
         await ctx.scheduler.runAfter(0, internal.files.deleteFileFromS3, {
           storageId: file.storageId,
@@ -276,7 +298,7 @@ export const deleteFolder = mutation({
         .query("folders")
         .withIndex("by_parent", (q) => q.eq("parentId", id))
         .collect();
-      queue.push(...children.map((c) => c._id));
+      queue.push(...children.filter((c) => c.ownerId === userId).map((c) => c._id));
       await ctx.db.delete(id);
     }
   },
