@@ -22,9 +22,15 @@
   - [Secrets Management](#secrets-management)
 - [Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
-  - [Environment Variables](#environment-variables)
-  - [Local Development](#local-development)
-  - [Docker Build & Run](#docker-build--run)
+  - [1. Install](#1-install)
+  - [2. Create the Convex backend](#2-create-the-convex-backend)
+  - [3. Create the S3 bucket and connect it to Convex](#3-create-the-s3-bucket-and-connect-it-to-convex)
+  - [4. Set up sign-in and run the app](#4-set-up-sign-in-and-run-the-app)
+  - [5. Build and run with Docker](#5-build-and-run-with-docker)
+  - [6. Set up the Jenkins pipeline](#6-set-up-the-jenkins-pipeline)
+  - [Day-to-day](#day-to-day)
+  - [Shutting down and costs](#shutting-down-and-costs)
+  - [Troubleshooting](#troubleshooting)
 - [Project Structure](#-project-structure)
 - [Contributing](#-contributing)
 
@@ -292,12 +298,12 @@ stage('Stop Existing Container') {
 ```
 
 #### 5. `Run New Container`
-Deploys the newly built image as a background container, mapping port `80` on the host. The `VITE_CONVEX_URL` secret is also passed as a runtime environment variable.
+Deploys the newly built image as a background container, mapping port `80` on the host. No runtime variables are needed: the Convex URL was compiled into the bundle at build time.
 
 ```groovy
 stage('Run New Container') {
     steps {
-        sh 'docker run -e VITE_CONVEX_URL=${VITE_CONVEX_URL} -d --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_NAME}:${IMAGE_TAG}'
+        sh 'docker run -d --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_NAME}:${IMAGE_TAG}'
     }
 }
 ```
@@ -310,7 +316,7 @@ Sensitive credentials are **never hard-coded** in the repository. Jenkins's buil
 
 | Secret ID | Used In | Purpose |
 |---|---|---|
-| `VITE_CONVEX_URL` | Jenkinsfile | Convex backend URL injected at build & runtime |
+| `VITE_CONVEX_URL` | Jenkinsfile | Convex backend URL compiled into the frontend at build time |
 | `CONVEX_AWS_REGION` | Convex environment | AWS region for S3 |
 | `CONVEX_AWS_ACCESS_KEY_ID` | Convex environment | AWS IAM access key |
 | `CONVEX_AWS_SECRET_ACCESS_KEY` | Convex environment | AWS IAM secret key |
@@ -322,79 +328,184 @@ The `VITE_CONVEX_URL` is retrieved via `credentials('VITE_CONVEX_URL')` in the J
 
 ## 🚦 Getting Started
 
+This section takes you from a fresh clone to the full stack running: the app, the Convex backend, the S3 bucket and the Jenkins pipeline. Steps 1–4 are enough to use the app; steps 5–6 add the Docker and CI/CD parts.
+
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) v18+
-- [npm](https://npmjs.com/) v9+
-- A [Convex](https://convex.dev/) account and project
-- An [AWS](https://aws.amazon.com/) account with an S3 bucket and IAM credentials
-- [Docker](https://www.docker.com/) (for containerized deployment)
-- [Jenkins](https://www.jenkins.io/) (for CI/CD automation)
+| Tool | Needed for | Check |
+|---|---|---|
+| Node.js 18+ and npm 9+ | everything | `node -v` |
+| A [Convex](https://convex.dev/) account (free tier is enough) | backend | `npx convex login` |
+| AWS CLI v2, signed in to your account | S3 bucket setup | `aws sts get-caller-identity` |
+| Docker | container build | `docker ps` |
+| Jenkins with the Pipeline, Git and Credentials Binding plugins | CI/CD | open `http://localhost:8080` |
 
 ---
 
-### Environment Variables
-
-Create a `.env.local` file in the project root:
-
-```env
-# Convex
-VITE_CONVEX_URL=https://<your-deployment>.convex.cloud
-
-# These are set in the Convex dashboard environment variables:
-# CONVEX_AWS_REGION=ap-south-1
-# CONVEX_AWS_ACCESS_KEY_ID=AKIA...
-# CONVEX_AWS_SECRET_ACCESS_KEY=...
-# CONVEX_AWS_S3_BUCKET=your-bucket-name
-```
-
-> ⚠️ **Important:** `CONVEX_AWS_*` variables must be configured in your **Convex project's environment variable settings** (dashboard → Settings → Environment Variables), not in your local `.env` file. They are accessed by Convex server-side functions only.
-
----
-
-### Local Development
+### 1. Install
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/<your-username>/SkyStore.git
 cd SkyStore
-
-# 2. Install dependencies
 npm install
-
-# 3. Set up environment variables
-cp .env .env.local
-# Edit .env.local with your VITE_CONVEX_URL
-
-# 4. Start the dev server (runs Vite + Convex backend in parallel)
-npm run dev
 ```
-
-The app will be available at `http://localhost:5173`.
-
-The `dev` script runs three processes in parallel:
-- `vite --open` — frontend dev server with HMR
-- `convex dev` — Convex backend watcher (pushes schema/function changes)
-- `node setup.mjs --once` — one-time setup tasks
 
 ---
 
-### Docker Build & Run
+### 2. Create the Convex backend
 
 ```bash
-# Build the production image
-docker build \
-  --build-arg VITE_CONVEX_URL=https://<your-deployment>.convex.cloud \
-  -t SkyStore:latest .
-
-# Run the container
-docker run -d \
-  --name SkyStore-container \
-  -p 80:80 \
-  SkyStore:latest
-
-# App is now live at http://localhost
+npx convex login                 # one-time, opens the browser
+npx convex dev --configure=new   # choose a cloud deployment, name it e.g. "skystore"
 ```
+
+When it prints **Convex functions ready**, it has written `CONVEX_DEPLOYMENT` and `VITE_CONVEX_URL` to `.env.local`. Leave this terminal running: it deploys every change you make in `convex/`.
+
+> `.env.local` is gitignored. The committed `.env` points at the original author's deployment and is overridden by `.env.local`.
+
+---
+
+### 3. Create the S3 bucket and connect it to Convex
+
+One script does all of it, and it's safe to run again:
+
+```bash
+./infra/setup.sh
+```
+
+It:
+
+- creates a private bucket `skystore-<account-id>-aps1` in `ap-south-1` with public access blocked, default encryption, CORS for `http://localhost`, `:5173` and `:8081`, and a rule that clears unfinished uploads after a day
+- creates an IAM user `skystore-app` that can only put, get and delete objects in that bucket
+- creates an access key for that user and stores it, with the region and bucket name, as Convex environment variables (`CONVEX_AWS_*`). The secret goes straight from AWS to Convex and is never written to disk.
+
+Optional: `BUDGET_EMAIL=you@example.com ./infra/setup.sh` also creates a $5/month AWS budget that emails you at 60%. An AWS budget only alerts; it does not stop spending.
+
+**Permissions the AWS CLI user needs.** If you don't run this as an admin, attach this inline policy to your CLI user. It's scoped to `skystore-*` buckets and the one app user. Replace `<account-id>`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow",
+      "Action": ["s3:CreateBucket","s3:DeleteBucket","s3:ListBucket","s3:DeleteObject",
+                 "s3:PutBucketCors","s3:PutEncryptionConfiguration",
+                 "s3:PutBucketPublicAccessBlock","s3:PutLifecycleConfiguration"],
+      "Resource": ["arn:aws:s3:::skystore-*","arn:aws:s3:::skystore-*/*"] },
+    { "Effect": "Allow",
+      "Action": ["iam:GetUser","iam:CreateUser","iam:DeleteUser","iam:PutUserPolicy",
+                 "iam:DeleteUserPolicy","iam:CreateAccessKey","iam:ListAccessKeys","iam:DeleteAccessKey"],
+      "Resource": "arn:aws:iam::<account-id>:user/skystore-app" }
+  ]
+}
+```
+
+To use a different region, change `REGION` at the top of `infra/setup.sh` and `infra/teardown.sh`.
+
+---
+
+### 4. Set up sign-in and run the app
+
+Convex Auth needs a signing key pair (`JWT_PRIVATE_KEY`, `JWKS`) and a `SITE_URL`. Generate them once per deployment:
+
+```bash
+npx @convex-dev/auth          # accept the defaults; use http://localhost:5173 as the site URL
+```
+
+Then, in a second terminal:
+
+```bash
+npm run dev:frontend          # http://localhost:5173
+```
+
+Check it works: create an account (any email; no verification mail is sent), create a folder, upload a file, open it, then delete the folder.
+
+`npx convex env list` should now show 7 variables: the 4 `CONVEX_AWS_*` values, `JWT_PRIVATE_KEY`, `JWKS` and `SITE_URL`.
+
+> `npm run dev` starts the frontend, `convex dev` and `setup.mjs` (which runs the auth setup on first launch) all together. Running them separately, as above, makes errors easier to read.
+
+---
+
+### 5. Build and run with Docker
+
+The Convex URL is compiled into the frontend, so pass it at build time:
+
+```bash
+docker build \
+  --build-arg VITE_CONVEX_URL=$(grep '^VITE_CONVEX_URL=' .env.local | cut -d= -f2 | cut -d' ' -f1) \
+  -t skystore:latest .
+
+docker run -d --name skystore-container -p 80:80 skystore:latest
+# http://localhost
+```
+
+The container only serves static files. The backend is still your Convex deployment.
+
+---
+
+### 6. Set up the Jenkins pipeline
+
+**a. Let Jenkins use Docker** (one-time):
+
+```bash
+sudo usermod -aG docker jenkins && sudo systemctl restart jenkins
+```
+
+**b. Add the credential.** In Jenkins, go to *Manage Jenkins → Credentials → System → Global → Add credentials*:
+
+- Kind: **Secret text**
+- ID: `VITE_CONVEX_URL`
+- Secret: your `https://<name>.convex.cloud` URL from `.env.local`
+
+**c. Create the job.** Go to *New Item → Pipeline* and name it `skystore`. Under *Pipeline*:
+
+- Definition: **Pipeline script from SCM**
+- SCM: **Git**, Repository URL: your fork's HTTPS URL, Branch: `*/main`
+- Script Path: `Jenkinsfile`
+
+**d. Run it once** with *Build Now*. The stages are checkout → Docker build → smoke test on port 8081 → remove the old container → run the new one on port 80.
+
+After that first run, Jenkins checks the repository every 5 minutes (`pollSCM` in the `Jenkinsfile`) and rebuilds when there's a new commit. A Jenkins running on your own machine can't receive GitHub webhooks, which is why it polls.
+
+---
+
+### Day-to-day
+
+| To… | Do this |
+|---|---|
+| Change backend code | keep `npx convex dev` running; it redeploys on save |
+| Change frontend code | `npm run dev:frontend` for live reload |
+| Deploy the container | push to your fork; Jenkins rebuilds within ~5 minutes |
+| Rotate the AWS key | delete `CONVEX_AWS_ACCESS_KEY_ID` in the Convex dashboard, then rerun `./infra/setup.sh` |
+| Switch Convex deployments | rerun steps 3 and 4 against the new deployment and update the Jenkins credential |
+
+---
+
+### Shutting down and costs
+
+The running costs are S3 storage (about $0.025 per GB per month) and requests (fractions of a cent). Convex's free tier and a local Jenkins cost nothing.
+
+To remove every AWS resource:
+
+```bash
+./infra/teardown.sh   # asks first, then deletes the bucket, all files in it, and the skystore-app user
+```
+
+Afterwards, remove the bootstrap policy from your CLI user if you added one.
+
+---
+
+### Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| Upload fails with a CORS or "Failed to fetch" error | The page's address isn't in the bucket's CORS list. Add it in `infra/setup.sh` and rerun. |
+| `Missing AWS configuration environment variables` in the Convex logs | Step 3 hasn't run against this deployment. Run `./infra/setup.sh`. |
+| Sign-in fails right away | The auth keys are missing. Run `npx @convex-dev/auth` (step 4). |
+| `setup.sh` reports `AccessDenied` | Your AWS CLI user lacks the permissions listed in step 3. |
+| Jenkins: `permission denied ... docker.sock` | Jenkins isn't in the `docker` group. See step 6a. |
+| Jenkins: `port is already allocated` | Something else is on port 80 or 8081. Stop it, e.g. `docker rm -f <old-container>`. |
+| The container loads but shows no data | The image was built without `VITE_CONVEX_URL`, or with the wrong value. Check the Jenkins credential. |
 
 ---
 
@@ -417,6 +528,10 @@ SkyStore/
 │   ├── index.css               # Global styles + Tailwind layers
 │   ├── main.tsx                # React entry point
 │   └── lib/                    # Shared utilities
+│
+├── infra/
+│   ├── setup.sh                # Creates S3 bucket + scoped IAM user, sets Convex env vars
+│   └── teardown.sh             # Deletes the bucket, its files and the IAM user
 │
 ├── Dockerfile                  # Multi-stage production Docker build
 ├── Jenkinsfile                 # Declarative CI/CD pipeline definition
