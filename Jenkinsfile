@@ -1,10 +1,15 @@
 pipeline {
     agent any
 
+    // Local Jenkins can't receive GitHub webhooks, so poll the repo instead
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
     environment {
-        IMAGE_NAME = 'cloudlet' // Local Docker image name
+        IMAGE_NAME = 'skystore' // Local Docker image name
         IMAGE_TAG = 'latest'
-        CONTAINER_NAME = 'cloudlet-container' // Name of the running container
+        CONTAINER_NAME = 'skystore-container' // Name of the running container
         VITE_CONVEX_URL = credentials('VITE_CONVEX_URL') // Retrieve the secret from Jenkins
     }
 
@@ -37,7 +42,7 @@ pipeline {
                     '''
 
                     sh '''
-                    curl -s http://localhost:8081 | grep -q "<title>Cloudlet</title>" || (docker logs temp-${CONTAINER_NAME} && docker stop temp-${CONTAINER_NAME} && docker rm temp-${CONTAINER_NAME} && exit 1)
+                    curl -s http://localhost:8081 | grep -q "<title>SkyStore</title>" || (docker logs temp-${CONTAINER_NAME} && docker stop temp-${CONTAINER_NAME} && docker rm temp-${CONTAINER_NAME} && exit 1)
                     '''
 
                     // Stop and remove the temporary container after the test

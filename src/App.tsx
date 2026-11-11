@@ -27,7 +27,7 @@ export default function App() {
             CL
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">Cloudlet</h1>
+            <h1 className="text-xl font-bold tracking-tight text-white">SkyStore</h1>
             <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Vault</p>
           </div>
         </div>

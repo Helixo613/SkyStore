@@ -257,6 +257,27 @@ export const deleteFolder = mutation({
       throw new Error("Folder not found or unauthorized");
     }
 
-    await ctx.db.delete(args.folderId);
+    // Walk the subtree so nested files/folders (and their S3 objects) aren't orphaned.
+    // ponytail: single mutation, fine for personal folders; very large trees could hit Convex per-mutation limits
+    const queue = [folder._id];
+    while (queue.length > 0) {
+      const id = queue.pop()!;
+      const files = await ctx.db
+        .query("files")
+        .withIndex("by_parent", (q) => q.eq("parentId", id))
+        .collect();
+      for (const file of files) {
+        await ctx.db.delete(file._id);
+        await ctx.scheduler.runAfter(0, internal.files.deleteFileFromS3, {
+          storageId: file.storageId,
+        });
+      }
+      const children = await ctx.db
+        .query("folders")
+        .withIndex("by_parent", (q) => q.eq("parentId", id))
+        .collect();
+      queue.push(...children.map((c) => c._id));
+      await ctx.db.delete(id);
+    }
   },
 });
