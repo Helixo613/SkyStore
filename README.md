@@ -303,7 +303,7 @@ Deploys the newly built image as a background container, mapping port `80` on th
 ```groovy
 stage('Run New Container') {
     steps {
-        sh 'docker run -d --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_NAME}:${IMAGE_TAG}'
+        sh 'docker run -d --restart unless-stopped --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_NAME}:${IMAGE_TAG}'
     }
 }
 ```
@@ -435,7 +435,7 @@ docker build \
   --build-arg VITE_CONVEX_URL=$(grep '^VITE_CONVEX_URL=' .env.local | cut -d= -f2 | cut -d' ' -f1) \
   -t iris-ops:latest .
 
-docker run -d --name iris-ops-container -p 80:80 iris-ops:latest
+docker run -d --restart unless-stopped --name iris-ops-container -p 80:80 iris-ops:latest
 # http://localhost
 ```
 
