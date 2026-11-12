@@ -12,7 +12,7 @@ export function SignInForm() {
   return (
     <div className="mx-auto w-full max-w-sm pt-6">
       <h1 className="text-2xl font-semibold tracking-tight">
-        {isSignIn ? "Sign in to SkyStore" : "Create your account"}
+        {isSignIn ? "Sign in to iris-ops" : "Create your account"}
       </h1>
       <p className="mt-1.5 text-sm text-muted">
         Your files, stored privately and available from any browser.

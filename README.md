@@ -1,4 +1,4 @@
-# ☁️ SkyStore — Secure Cloud File Vault
+# ☁️ iris-ops — Secure Cloud File Vault
 
 > A full-stack, production-ready cloud storage application powered by **Convex**, **AWS S3**, and **React**, with a fully automated **CI/CD pipeline** using **Jenkins** and **Docker**.
 
@@ -38,7 +38,7 @@
 
 ## 🔍 Overview
 
-**SkyStore** is a minimalist, lightning-fast cloud storage platform that allows authenticated users to securely upload, organize, and access files from anywhere. Files are stored directly in **AWS S3** using pre-signed URLs, while metadata and user accounts are managed through **Convex**'s real-time backend.
+**iris-ops** is a minimalist, lightning-fast cloud storage platform that allows authenticated users to securely upload, organize, and access files from anywhere. Files are stored directly in **AWS S3** using pre-signed URLs, while metadata and user accounts are managed through **Convex**'s real-time backend.
 
 The project is built with a strong DevOps focus — the entire lifecycle from code commit to production deployment is automated through a **Jenkins CI/CD pipeline** that builds a Docker image, runs smoke tests, and deploys the containerized application.
 
@@ -269,14 +269,14 @@ stage('Build Docker Image') {
 ```
 
 #### 3. `Smoke Test`
-Starts a **temporary container** on port `8081` and uses `curl` to verify the app is serving correctly by checking for the expected `<title>SkyStore</title>` tag in the HTML response. If the check fails, Docker logs are printed and the pipeline aborts.
+Starts a **temporary container** on port `8081` and uses `curl` to verify the app is serving correctly by checking for the expected `<title>iris-ops</title>` tag in the HTML response. If the check fails, Docker logs are printed and the pipeline aborts.
 
 ```groovy
 stage('Smoke Test') {
     steps {
         sh 'docker run --name temp-${CONTAINER_NAME} -d -p 8081:80 ${IMAGE_NAME}:${IMAGE_TAG}'
         sh 'sleep 5'
-        sh 'curl -s http://localhost:8081 | grep -q "<title>SkyStore</title>" || (docker logs ... && exit 1)'
+        sh 'curl -s http://localhost:8081 | grep -q "<title>iris-ops</title>" || (docker logs ... && exit 1)'
         sh 'docker stop temp-${CONTAINER_NAME} && docker rm temp-${CONTAINER_NAME}'
     }
 }
@@ -433,9 +433,9 @@ The Convex URL is compiled into the frontend, so pass it at build time:
 ```bash
 docker build \
   --build-arg VITE_CONVEX_URL=$(grep '^VITE_CONVEX_URL=' .env.local | cut -d= -f2 | cut -d' ' -f1) \
-  -t skystore:latest .
+  -t iris-ops:latest .
 
-docker run -d --name skystore-container -p 80:80 skystore:latest
+docker run -d --name iris-ops-container -p 80:80 iris-ops:latest
 # http://localhost
 ```
 

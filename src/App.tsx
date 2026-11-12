@@ -18,7 +18,7 @@ export default function App() {
         <div className="mx-auto flex h-14 w-full max-w-4xl items-center justify-between">
           <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
             <CloudIcon />
-            SkyStore
+            iris-ops
           </span>
           <SignOutButton />
         </div>
